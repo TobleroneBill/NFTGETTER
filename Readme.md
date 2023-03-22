@@ -78,3 +78,6 @@ Takes a directory, and the dimensions to scale each picture by.
 </ol>
 
 Thats all. This is a dumb project of mine, but if anyone finds this useful, <u>feel free to steal it</u> lmao :heart:
+
+Here is a link to a gallery of oddly diffuclt to find poops (if link stays active):
+https://ibb.co/album/9sQpLN
