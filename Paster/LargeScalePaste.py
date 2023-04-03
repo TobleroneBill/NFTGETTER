@@ -9,10 +9,12 @@
 
 import datetime
 import os
+import pathlib
 import random
 import sys
 import time
 
+import oschmod  # I'm having wierd file permmission issues
 import PIL
 from PIL import Image
 import numpy as np
@@ -21,45 +23,92 @@ np.set_printoptions(threshold=sys.maxsize)
 
 
 # Turn everything in given directory to a jpg (used to counter an issue with color depth)
-def Convert2JPG(_Directory):
+# InPlace, changes the original images
+# DeleteFailure deletes files that are perieved as corrupted (anything that throws an error)
+def Convert2JPG(_Directory,InPlace=False,DeleteFailure=False):
     count = 1
-    directory = _Directory
+    directory = pathlib.Path(_Directory)
     imgList = os.listdir(directory)
+    savepath = f'{directory}\JPEG'
 
-    if not os.path.exists(f'{directory}\\JPEG'):
-        print(f'making folder at:\n {directory}\\JPEG')
-        os.mkdir(f'{directory}\\JPEG')
+    # Make a new folder
+    if not InPlace:
+        if not os.path.exists(savepath):
+            print(f'making folder at:\n {savepath}')
+            os.mkdir(savepath)
 
-    for i, pic in enumerate(imgList):
-        if '.png' in pic:  # only effects pngs
-            try:
-                with Image.open(f'{directory}\\{pic}') as p:
-                    print(f'Converting: {pic}')
-                    p = p.convert('RGB')
-                    p.save(f'{directory}\\JPEG\\{count}.jpg')
-                    count += 1
-            except PIL.UnidentifiedImageError:
-                print(f'File data Corrupted. Skipping {pic}')
+        for i, pic in enumerate(imgList):
+            # if listing is a directory, or anything else that isnt a file, skip
+            if not os.path.isfile(str(directory/pic)):
+                print(f'{pic} is not a file')
                 continue
 
+            #if '.png' in pic or '.jpg':  # ATM focused on png and JPEG, could make this general, but idk
+            try:
+                print(f'converting {pic}')
+                p = Image.open(f'{directory}\{pic}','r')
+                RGBp = p.convert('RGB')
+                # 100% a safe path
+                saveLoc = savepath
+                saveLoc = saveLoc + f'\{i}.jpg'
+                RGBp.save(saveLoc)
+                count += 1
 
-# set everything to Given Width and height
-def ResizePics(_Directory, width, height):
-    directory = _Directory
+            except PIL.UnidentifiedImageError:
+                print(f'File data Corrupted. Skipping {pic}')
+                if DeleteFailure:
+                    print(f'Deleting {pic}')
+                    os.remove(pathlib.Path.joinpath(directory / pic))
+                continue
+    else:   # Use current folder
+        for i, pic in enumerate(imgList):
+            # if listing is a directory, or anything else that isnt a file, skip
+            if not os.path.isfile(str(directory / pic)):
+                print(f'{pic} is not a file')
+                continue
+            try:
+                print(f'converting {pic}')
+                p = Image.open(f'{directory}\{pic}', 'r')
+                RGBp = p.convert('RGB')
+                # 100% a safe path
+                RGBp.save(pathlib.Path.joinpath(directory/pic))
+                count += 1
+
+            except PIL.UnidentifiedImageError:
+                print(f'File data Corrupted. Skipping {pic}')
+                if DeleteFailure:
+                    p.close()
+                    print(f'Deleting {pic}')
+                    os.remove(pathlib.Path.joinpath(directory / pic))
+                continue
+
+# set everything to Given Width and height in a directory
+def ResizePics(_Directory, width, height ,DeleteFailure=False):
+    directory = pathlib.Path(_Directory)
     imglist = os.listdir(directory)
+
     for pic in imglist:
-        if '.png' in pic:  # only effects pngs
-            print(f'{directory}\\{pic}')
-            try:
-                with Image.open(f'{directory}\\{pic}') as img:
-                    resized = img.resize((width, height))
-                    resized.save(f'{directory}\\{pic}')
-                    print(f'resized {pic}')
-            except PIL.UnidentifiedImageError:
-                print(f'File data Corrupted. Skipping {pic}')
-                continue
+        if not os.path.isfile(str(directory/pic)):
+            print(f'{pic} is not a file')
+            continue
+
+        print(f'{directory}\\{pic}')
+        try:
+            with Image.open(f'{directory}\\{pic}') as img:
+                resized = img.resize((width, height))
+                resized = resized.convert(mode='RGB')
+                resized.save(f'{directory}\\{pic}')
+                print(f'resized {pic}')
+
+        except PIL.UnidentifiedImageError:
+            print(f'File data Corrupted. Skipping {pic}')
+            if DeleteFailure:
+                print(f'Deleting {pic}')
+                os.remove(pathlib.Path.joinpath(directory/pic))
+            continue
 
 
+# Resizes in place
 def Resize(_imgPath, width, height):
     pic = _imgPath
     try:
@@ -72,41 +121,102 @@ def Resize(_imgPath, width, height):
 
 
 # mass check jpg collection dimensions
-def PrintDetails(_Directory):
+def PrintDimensions(_Directory):
     directory = _Directory
     lol = os.listdir(directory)
     for pic in lol:
         img = Image.open(f'{directory}\\{pic}')
-        print(img.size)
+        print(f'{pic}: {img.size}')
 
 
-# add shit randomly to each pic in location
-def Shit(_Directory):
+# add shit randomly to each pic in directory
+def Shit(_Directory,InPlace=False,DeleteFailure=False):
     count = 1
-    directory = _Directory
+    directory = pathlib.Path(_Directory)
     print(f'Reading from: {directory}')
     random.seed(datetime.datetime.now().second)
     imglist = os.listdir(directory)
 
     # make dir to store new images
-    if not os.path.exists(f'{directory}\\shitpics'):
+    if not os.path.exists(f'{directory}\\shitpics') and not InPlace:
         print(f'Making shitty folder at:\n {directory}\\shitpics')
         os.mkdir(f'{directory}\\shitpics')
 
     for i, pic in enumerate(imglist):
-        if os.path.isdir(pic) or pic.__contains__('.py'):  # only effects pngs
+        if not os.path.isfile(str(directory/pic)):  # skip folders
+            print(f'{pic} is not a file')
             continue
+
+        print(f'/______________________________________/{pic}/______________________________________/')
+        # load the images
+        print(f'Loading image: {directory}\\{pic}')
+
+        try:
+            NFTimg = Image.open(f'{directory}\\{pic}')
+        except:
+            print(f'File data Corrupted or invalid. Skipping {pic}')
+            if DeleteFailure:
+                os.remove(pathlib.Path.joinpath(directory/NFTimg))
+            continue
+
+        print(f'Loading poop image')
+        shtimg = Image.open('Shit.png')  # should be saved where this .py file is
+
+        # apply rotations and scaling
+        print(f'transforming poop image')
+        shtimg = shtimg.rotate(random.randint(0, 359))
+        shtimg = shtimg.resize((random.randint(50, 100), random.randint(50, 100)))
+
+        print(shtimg.size)
+        xpos = random.randint(10, (NFTimg.size[0])-shtimg.size[0])
+        ypos = random.randint(10, (NFTimg.size[1])-shtimg.size[1])
+
+        # paste the shit on at a random location. uses itself as a mask to keep transparency
+        NFTimg.paste(shtimg, (xpos,ypos), shtimg)
+
+        # folder for these shitty fucking images
+        print(f'Saving Result')
+        if not InPlace:
+            NFTimg.save(f'{directory}\\shitpics\\{count}.png')  # save in new folder
         else:
-            print(f'/______________________________________/{pic}/______________________________________/')
-            # load the images
-            print(f'Loading image: {directory}\\{pic}')
+            NFTimg.save(pathlib.Path.joinpath(directory/NFTimg))
+        count += 1
 
-            try:
-                NFTimg = Image.open(f'{directory}\\{pic}')
-            except:
-                print(f'File data Corrupted or invalid. Skipping {pic}')
-                continue
+    print('FINISHED SHITTING')
 
+
+# add shits many times
+def RepeatShit(_Dir,loops,InPlace=False,DeleteFailure=False):
+    count = 0
+    directory = pathlib.Path(_Dir)
+    print(f'Reading from: {directory}')
+    random.seed(datetime.datetime.now().second)
+    imglist = os.listdir(directory)
+
+    # make dir to store new images
+
+    if not os.path.exists(f'{directory}\\shitpics') and not InPlace:
+        print(f'Making shitty folder at:\n {directory}\\shitpics')
+        os.mkdir(f'{directory}\\shitpics')
+
+    for i, pic in enumerate(imglist):
+        if not os.path.isfile(str(directory/pic)):  # skip folders
+            print(f'{pic} is not a file')
+            continue
+
+        print(f'/______________________________________/{pic}/______________________________________/')
+        # load the images
+        print(f'Loading image: {directory}\\{pic}')
+
+        try:
+            NFTimg = Image.open(f'{directory}\\{pic}')
+        except:
+            print(f'File data Corrupted or invalid. Skipping {pic}')
+            if DeleteFailure:
+                os.remove(pathlib.Path.joinpath(directory / pic))
+            continue
+
+        for i in range(1,loops):
             print(f'Loading poop image')
             shtimg = Image.open('Shit.png')  # should be saved where this .py file is
             # apply rotations and scaling
@@ -119,9 +229,9 @@ def Shit(_Directory):
             # paste the shit on at a random location. uses itself as a mask to keep transparency
             NFTimg.paste(shtimg, (xpos,ypos), shtimg)
             # folder for these shitty fucking images
-            print(f'Saving Result')
-            NFTimg.save(f'{directory}\\shitpics\\{count}.png')
-            count += 1
+        print(f'Saving Result')
+        NFTimg.save(f'{directory}\\shitpics\\{count}.png')
+        count += 1
 
 
 # can imagine this being used for a watermark I guess
@@ -191,4 +301,8 @@ def ShitAllOver(NFTDir, resizeW, resizeH):
 
 if __name__ == '__main__':
     # Make pngs good 1ST
-    Shit(r'C:\Users\JOE\Desktop\Projects\PythonSuicide\NFTs\2001_Sotschi')
+    #print('Wrong main')
+    Shit(r'Images')
+    #Convert2JPG(r'Images',InPlace=True,DeleteFailure=True)
+    #ResizePics('Images',500,500)
+    #PrintDimensions('Images')
